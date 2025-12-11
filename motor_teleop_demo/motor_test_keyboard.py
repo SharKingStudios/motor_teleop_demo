@@ -24,24 +24,33 @@ class MotorFLKeyboard(Node):
         self._old = termios.tcgetattr(self._fd)
         tty.setcbreak(self._fd)
 
-        # poll 10 Hz
-        self.timer = self.create_timer(0.1, self._tick)
+        # poll 100 Hz
+        self.timer = self.create_timer(0.01, self._tick)
 
     def _tick(self):
-        if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
+        last = None
+
+        # Drain everything currently in the buffer
+        while sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
             ch = sys.stdin.read(1)
-            if ch == 'w':
-                self.pub.publish(Int8(data=1))
-                self.get_logger().info("Sent: FORWARD")
-            elif ch == 's':
-                self.pub.publish(Int8(data=-1))
-                self.get_logger().info("Sent: BACKWARD")
-            elif ch == 'a':
-                self.pub.publish(Int8(data=0))
-                self.get_logger().info("Sent: STOP")
-            elif ch == 'q':
-                self.get_logger().info("Quitting…")
-                rclpy.shutdown()
+            last = ch
+
+        # Nothing pressed since last tick
+        if last is None:
+            return
+
+        if last == 'w':
+            self.pub.publish(Int8(data=1))
+            self.get_logger().info("Sent: FORWARD")
+        elif last == 's':
+            self.pub.publish(Int8(data=-1))
+            self.get_logger().info("Sent: BACKWARD")
+        elif last == 'a':
+            self.pub.publish(Int8(data=0))
+            self.get_logger().info("Sent: STOP")
+        elif last == 'q':
+            self.get_logger().info("Quitting…")
+            rclpy.shutdown()
 
     def destroy_node(self):
         try:
